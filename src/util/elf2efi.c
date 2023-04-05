@@ -636,6 +636,8 @@ static struct pe_section * process_section ( struct elf_file *elf,
 	new->hdr.SizeOfRawData = section_filesz;
 	if ( shdr->sh_type == SHT_PROGBITS ) {
 		new->hdr.PointerToRawData = elf_lma ( elf, shdr, name );
+		if ( new->hdr.PointerToRawData == 0 )
+			new->hidden = 1;
 	}
 
 	/* Fill in section characteristics and update RVA limits */
@@ -1013,28 +1015,6 @@ static void write_pe_file ( struct pe_header *pe_header,
 			section->fixup ( section );
 	}
 
-	/* Write file header */
-	if ( fwrite ( pe_header,
-		      ( offsetof ( typeof ( *pe_header ), nt.OptionalHeader ) +
-			pe_header->nt.FileHeader.SizeOfOptionalHeader ),
-		      1, pe ) != 1 ) {
-		perror ( "Could not write PE header" );
-		exit ( 1 );
-	}
-
-	/* Write section headers */
-	for ( section = pe_sections ; section ; section = section->next ) {
-		if ( section->hidden )
-			continue;
-		if ( fwrite ( &section->hdr, sizeof ( section->hdr ),
-			      1, pe ) != 1 ) {
-			perror ( "Could not write section header" );
-			exit ( 1 );
-		}
-		count++;
-	}
-	assert ( count == pe_header->nt.FileHeader.NumberOfSections );
-
 	/* Write sections */
 	for ( section = pe_sections ; section ; section = section->next ) {
 		if ( section->hdr.PointerToRawData & ( EFI_FILE_ALIGN - 1 ) ) {
@@ -1058,6 +1038,32 @@ static void write_pe_file ( struct pe_header *pe_header,
 			exit ( 1 );
 		}
 	}
+
+	/* Write file header */
+	if ( fseek ( pe, 0, SEEK_SET ) != 0 ) {
+		eprintf ( "Could not rewind: %s\n", strerror ( errno ) );
+		exit ( 1 );
+	}
+	if ( fwrite ( pe_header,
+		      ( offsetof ( typeof ( *pe_header ), nt.OptionalHeader ) +
+			pe_header->nt.FileHeader.SizeOfOptionalHeader ),
+		      1, pe ) != 1 ) {
+		perror ( "Could not write PE header" );
+		exit ( 1 );
+	}
+
+	/* Write section headers */
+	for ( section = pe_sections ; section ; section = section->next ) {
+		if ( section->hidden )
+			continue;
+		if ( fwrite ( &section->hdr, sizeof ( section->hdr ),
+			      1, pe ) != 1 ) {
+			perror ( "Could not write section header" );
+			exit ( 1 );
+		}
+		count++;
+	}
+	assert ( count == pe_header->nt.FileHeader.NumberOfSections );
 }
 
 /**
