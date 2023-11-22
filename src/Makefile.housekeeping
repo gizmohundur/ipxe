@@ -352,7 +352,7 @@ platform :
 	@$(ECHO) $(PLATFORM)
 
 # Determine security flag
-DEFAULT_SECUREBOOT := 0
+DEFAULT_SECUREBOOT := 1
 SECUREBOOT	:= $(firstword $(BIN_SECUREBOOT) $(DEFAULT_SECUREBOOT))
 CFLAGS		+= -DSECUREBOOT=$(SECUREBOOT)
 secureboot :
